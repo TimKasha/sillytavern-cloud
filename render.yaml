@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sillytavern-cloud
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: SILLYTAVERN_LISTEN
+        value: "true"
+      - key: SILLYTAVERN_PORT
+        value: "10000"
+      - key: SILLYTAVERN_BASICAUTHMODE
+        value: "true"
+      - key: SILLYTAVERN_WHITELISTMODE
+        value: "false"
+      - key: SILLYTAVERN_BASICAUTHUSER
+        sync: false
