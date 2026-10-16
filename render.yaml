@@ -5,13 +5,13 @@ services:
     plan: free
     healthCheckPath: /
     envVars:
+      - key: PORT
+        value: "8000"
       - key: SILLYTAVERN_LISTEN
         value: "true"
       - key: SILLYTAVERN_PORT
-        value: "10000"
+        value: "8000"
       - key: SILLYTAVERN_BASICAUTHMODE
         value: "true"
       - key: SILLYTAVERN_WHITELISTMODE
         value: "false"
-      - key: SILLYTAVERN_BASICAUTHUSER
-        sync: false
