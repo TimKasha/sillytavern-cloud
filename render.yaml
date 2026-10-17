@@ -11,7 +11,17 @@ services:
         value: "true"
       - key: SILLYTAVERN_PORT
         value: "8000"
-      - key: SILLYTAVERN_BASICAUTHMODE
-        value: "true"
       - key: SILLYTAVERN_WHITELISTMODE
         value: "false"
+      - key: SILLYTAVERN_BASICAUTHMODE
+        value: "true"
+      # Логин и пароль
+      - key: SILLYTAVERN_BASICAUTH_USER
+        value: "admin"
+      - key: SILLYTAVERN_BASICAUTH_PASSWORD
+        sync: false # Задашь руками в панели Render, чтобы не светить в открытом коде
+      # Настройки автобэкапа
+      - key: BACKUP_REPO
+        sync: false # Пример: TimKasha/sillytavern-data
+      - key: GITHUB_TOKEN
+        sync: false # Твой персональный токен GitHub (PAT)
