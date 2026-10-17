@@ -1,12 +1,14 @@
 #!/bin/bash
 
+# Переходим жестко в корень проекта
+cd /home/node/app || exit 1
+
 DATA_DIR="/home/node/app/data"
 BACKUP_DIR="/tmp/backup_repo"
 
-# Разрешаем git работать под root с любыми директориями
 git config --global --add safe.directory '*'
 
-# 1. Восстановление данных при старте
+# 1. Восстановление данных из репозитория
 if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
     echo "==> [Restore] Проверка бэкапа из https://github.com/${BACKUP_REPO}..."
     rm -rf "$BACKUP_DIR"
@@ -15,47 +17,39 @@ if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
     if [ -d "$BACKUP_DIR" ]; then
         mkdir -p "$DATA_DIR"
         find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -rf {} "$DATA_DIR/" \; 2>/dev/null
-        echo "==> [Restore] Данные успешно подтянуты из GitHub!"
+        echo "==> [Restore] Данные перенесены!"
     else
-        echo "==> [Restore] Репозиторий пока пуст или не найден. Начнем с чистой базы."
+        echo "==> [Restore] Репозиторий пуст, начинаем с нуля."
     fi
 fi
 
-# 2. Функция сохранения
-push_backup() {
-    if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
-        if [ ! -d "$BACKUP_DIR/.git" ]; then
-            git clone --depth 1 "https://${GITHUB_TOKEN}@github.com/${BACKUP_REPO}.git" "$BACKUP_DIR" 2>/dev/null
-        fi
-
-        if [ -d "$BACKUP_DIR/.git" ] && [ -d "$DATA_DIR" ]; then
-            echo "==> [Backup] Синхронизация данных с GitHub..."
-            find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -rf {} "$BACKUP_DIR/" \; 2>/dev/null
-            
-            cd "$BACKUP_DIR" || return
-            git config user.email "bot@sillytavern.cloud"
-            git config user.name "SillyTavern AutoBackup"
-
-            if [ -n "$(git status --porcelain)" ]; then
-                git add -A
-                git commit -m "Auto-backup $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-                git push origin main 2>/dev/null || echo "==> [Backup] Push не удался, повторим позже."
-                echo "==> [Backup] Успешно отправлено в GitHub!"
-            fi
-            cd /home/node/app || return
-        fi
-    fi
-}
-
-# 3. Автосохранение каждые 15 минут в фоне
+# 2. Фоновый цикл автобэкапа (раз в 15 минут)
 (
     while true; do
         sleep 900
-        push_backup
+        if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
+            if [ ! -d "$BACKUP_DIR/.git" ]; then
+                git clone --depth 1 "https://${GITHUB_TOKEN}@github.com/${BACKUP_REPO}.git" "$BACKUP_DIR" 2>/dev/null
+            fi
+
+            if [ -d "$BACKUP_DIR/.git" ] && [ -d "$DATA_DIR" ]; then
+                find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -rf {} "$BACKUP_DIR/" \; 2>/dev/null
+                cd "$BACKUP_DIR" || continue
+                git config user.email "bot@sillytavern.cloud"
+                git config user.name "SillyTavern AutoBackup"
+
+                if [ -n "$(git status --porcelain)" ]; then
+                    git add -A
+                    git commit -m "Auto-backup $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+                    git push origin main 2>/dev/null || true
+                    echo "==> [Backup] Успешно сохранено!"
+                fi
+                cd /home/node/app || continue
+            fi
+        fi
     done
 ) &
 
-# 4. Запуск сервера напрямую из рабочей директории
-cd /home/node/app
-echo "==> Запуск SillyTavern сервера..."
-exec node src/server-init.js
+# 3. Запуск сервера напрямую
+echo "==> Запуск SillyTavern..."
+exec node server.js
