@@ -3,23 +3,25 @@
 DATA_DIR="/home/node/app/data"
 BACKUP_DIR="/tmp/backup_repo"
 
-# 1. Восстановление данных при старте (если репозиторий задан)
+# Разрешаем git работать под root с любыми директориями
+git config --global --add safe.directory '*'
+
+# 1. Восстановление данных при старте
 if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
     echo "==> [Restore] Проверка бэкапа из https://github.com/${BACKUP_REPO}..."
     rm -rf "$BACKUP_DIR"
     git clone --depth 1 "https://${GITHUB_TOKEN}@github.com/${BACKUP_REPO}.git" "$BACKUP_DIR" 2>/dev/null
-    
+
     if [ -d "$BACKUP_DIR" ]; then
         mkdir -p "$DATA_DIR"
-        # Копируем всё кроме служебной папки .git
         find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -rf {} "$DATA_DIR/" \; 2>/dev/null
-        echo "==> [Restore] Данные перенесены в data/"
+        echo "==> [Restore] Данные успешно подтянуты из GitHub!"
     else
-        echo "==> [Restore] Не удалось склонировать (возможно, репозиторий пока пуст). Стартуем с чистой базой."
+        echo "==> [Restore] Репозиторий пока пуст или не найден. Начнем с чистой базы."
     fi
 fi
 
-# 2. Функция создания резервной копии
+# 2. Функция сохранения
 push_backup() {
     if [ -n "$GITHUB_TOKEN" ] && [ -n "$BACKUP_REPO" ]; then
         if [ ! -d "$BACKUP_DIR/.git" ]; then
@@ -37,7 +39,7 @@ push_backup() {
             if [ -n "$(git status --porcelain)" ]; then
                 git add -A
                 git commit -m "Auto-backup $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-                git push origin main 2>/dev/null || echo "==> [Backup] Push failed, retry later."
+                git push origin main 2>/dev/null || echo "==> [Backup] Push не удался, повторим позже."
                 echo "==> [Backup] Успешно отправлено в GitHub!"
             fi
             cd /home/node/app || return
@@ -45,7 +47,7 @@ push_backup() {
     fi
 }
 
-# 3. Фоновый процесс синхронизации раз в 15 минут
+# 3. Автосохранение каждые 15 минут в фоне
 (
     while true; do
         sleep 900
@@ -53,6 +55,7 @@ push_backup() {
     done
 ) &
 
-# 4. Запуск сервера как основного процесса (PID 1)
+# 4. Запуск сервера напрямую из рабочей директории
+cd /home/node/app
 echo "==> Запуск SillyTavern сервера..."
 exec node src/server-init.js
