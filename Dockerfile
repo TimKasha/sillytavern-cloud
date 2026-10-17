@@ -7,12 +7,13 @@ WORKDIR /home/node/app
 RUN (apt-get update && apt-get install -y --no-install-recommends git bash ca-certificates) || \
     (apk update && apk add --no-cache git bash ca-certificates)
 
-# Предсборка ассетов прямо во время сборки Dockerfile:
-# Запускаем server-init с переменной окружения на 60 секунд. 
-# На серверах сборщика Render мощный CPU — Webpack скомпилирует всё за 15-20 секунд и сохранит в слой образа.
-RUN timeout 90s node src/server-init.js || true
+# Заранее создаем config.yaml с отключенным автообновлением контента
+RUN if [ -f "./default/config.yaml" ]; then cp ./default/config.yaml ./config.yaml; fi && \
+    sed -i 's/skipContentCheck: false/skipContentCheck: true/g' ./config.yaml 2>/dev/null || true
 
-# Копируем entrypoint
+# Полная предсборка библиотек webpack на этапе сборки образа (здесь нет лимита в 4 минуты)
+RUN node ./src/fast-stats.js || true
+
 COPY entrypoint.sh /home/node/app/entrypoint.sh
 RUN chmod +x /home/node/app/entrypoint.sh
 
