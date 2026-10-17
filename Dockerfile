@@ -1,19 +1,18 @@
 FROM ghcr.io/sillytavern/sillytavern:latest
 
+# Оставляем root — официальный образ Таверны требует прав root для записи конфигов
 USER root
 
-# Доустанавливаем git и bash для работы автобэкапа
+# Доустанавливаем git и bash для автобэкапа
 RUN (apt-get update && apt-get install -y --no-install-recommends git bash ca-certificates) || \
     (apk update && apk add --no-cache git bash ca-certificates)
 
-# Предкомпиляция ассетов на этапе сборки образа (решает проблему с таймаутом Render)
-RUN npm run build || true
+# Предсборка вебпака прямо во время сборки образа (чтобы не жрало время при старте)
+RUN node -e "const webpack = require('webpack'); const config = require('./webpack.config.js'); webpack(config).run((err) => { if (err) console.error(err); else console.log('Webpack pre-compiled!'); process.exit(0); });" || true
 
-# Копируем скрипт автозапуска и синхронизации
+# Копируем скрипт запуска
 COPY entrypoint.sh /home/node/app/entrypoint.sh
-RUN chmod +x /home/node/app/entrypoint.sh && chown node:node /home/node/app/entrypoint.sh
-
-USER node
+RUN chmod +x /home/node/app/entrypoint.sh
 
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=480"
